@@ -21,6 +21,16 @@ type interactionKey struct {
 	ionB string
 }
 
+var interactions = map[interactionKey]float64{
+	interactionKey{"mn4", "mn4"}:       0.0,
+	interactionKey{"mn4", "mn3ver"}:    1.35,
+	interactionKey{"mn4", "mnhor"}:     7.77,
+	interactionKey{"mn3hor", "mn4"}:    7.77,
+	interactionKey{"mn3ver", "mn4"}:    1.35,
+	interactionKey{"mn3hor", "mn3ver"}: 4.65,
+	interactionKey{"mn3ver", "mn3hor"}: 4.65,
+}
+
 func generateRand() float64 {
 	seed := time.Now().UnixNano()
 	source := rand.NewSource(seed)
@@ -70,25 +80,12 @@ func createLattice(length int, width int, height int) [][][]ion {
 	return ions
 }
 
-func neigborEnergy(interactions map[interactionKey]float64, ionA ion, ionB ion, e float64) float64 {
+func neighborEnergy(interactions map[interactionKey]float64, ionA ion, ionB ion) float64 {
 	interaction := interactions[interactionKey{ionA: ionA.i_type, ionB: ionB.i_type}]
-	return e - (ionA.spin[0]*ionB.spin[0]+ionA.spin[1]*ionB.spin[1]+ionA.spin[2]*ionB.spin[2])*interaction
+	return (ionA.spin[0]*ionB.spin[0] + ionA.spin[1]*ionB.spin[1] + ionA.spin[2]*ionB.spin[2]) * interaction
 }
 
-func getInteractions() map[interactionKey]float64 {
-	interactions := map[interactionKey]float64{
-		interactionKey{"mn4", "mn4"}:       0.0,
-		interactionKey{"mn4", "mn3ver"}:    1.35,
-		interactionKey{"mn4", "mnhor"}:     7.77,
-		interactionKey{"mn3hor", "mn4"}:    7.77,
-		interactionKey{"mn3ver", "mn4"}:    1.35,
-		interactionKey{"mn3hor", "mn3ver"}: 4.65,
-		interactionKey{"mn3ver", "mn3hor"}: 4.65,
-	}
-	return interactions
-}
-
-func energyDiff(latticeIon ion, ionTemp ion, l lattice, in map[interactionKey]float64, i int, j int, k int) float64 {
+func energyDiff(latticeIon ion, ionTemp ion, l lattice, i int, j int, k int) float64 {
 	e1, e2 := 0.0, 0.0
 
 	neighbours := []ion{
@@ -101,15 +98,13 @@ func energyDiff(latticeIon ion, ionTemp ion, l lattice, in map[interactionKey]fl
 	}
 
 	for _, neighbour := range neighbours {
-		e1 = neigborEnergy(in, latticeIon, neighbour, e1)
-		e2 = neigborEnergy(in, ionTemp, neighbour, e2)
+		e1 -= neighborEnergy(interactions, latticeIon, neighbour)
+		e2 -= neighborEnergy(interactions, ionTemp, neighbour)
 	}
 	return e2 - e1
 }
 
 func (l *lattice) updateEnergy() {
-	interactions := getInteractions()
-
 	for i := 1; i < len((*l).ions)-1; i++ {
 		for j := 1; j < len((*l).ions[0])-1; j++ {
 			for k := 1; k < len((*l).ions[0][0])-1; k++ {
@@ -118,7 +113,7 @@ func (l *lattice) updateEnergy() {
 				ionTemp := latticeIon
 				ionTemp.setupSpin()
 
-				eDiff := energyDiff(latticeIon, ionTemp, *l, interactions, i, j, k)
+				eDiff := energyDiff(latticeIon, ionTemp, *l, i, j, k)
 
 				if eDiff < 0 {
 					(*l).ions[i][j][k] = ionTemp
